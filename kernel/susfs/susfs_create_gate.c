@@ -55,6 +55,7 @@
 #include "susfs_kprobe.h"
 #include "symbol_resolver.h"
 #include "susfs_log.h"
+#include "susfs_icall.h"
 
 #ifdef __aarch64__
 /* The AArch32 table numbers (arch/arm/tools/syscall.tbl); the native ones come
@@ -148,17 +149,17 @@ static __nocfi noinline bool create_name_hidden(int dfd, const char __user *path
 	if (!create_getname_fn || !create_filename_lookup_fn || !create_putname_fn)
 		return false;
 
-	name = create_getname_fn(path, 0, NULL);
+	name = SUSFS_ICALL(create_getname_fn, path, 0, NULL);
 	if (IS_ERR(name))
 		return false;
 
-	rc = create_filename_lookup_fn(dfd, name, 0, &p, NULL);
+	rc = SUSFS_ICALL(create_filename_lookup_fn, dfd, name, 0, &p, NULL);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
 	/* filename_lookup() consumed `name` through 5.14; 5.15 removed that putname() and
 	 * made the caller own it.  Do not put it twice on 5.10/5.14: the second putname()
 	 * is the double free that panics init (create_name_hidden -> putname). */
 #else
-	create_putname_fn(name);
+	SUSFS_ICALL(create_putname_fn, name);
 #endif
 	if (rc)
 		return false;		/* absent: the kernel's own answer */
@@ -189,13 +190,13 @@ static __nocfi noinline int create_call_vfs_mkdir(struct path *path,
 						 struct dentry *dentry, umode_t mode)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-	return create_vfs_mkdir_fn(mnt_idmap(path->mnt), d_inode(path->dentry),
+	return SUSFS_ICALL(create_vfs_mkdir_fn, mnt_idmap(path->mnt), d_inode(path->dentry),
 				   dentry, mode);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
-	return create_vfs_mkdir_fn(mnt_user_ns(path->mnt), d_inode(path->dentry),
+	return SUSFS_ICALL(create_vfs_mkdir_fn, mnt_user_ns(path->mnt), d_inode(path->dentry),
 				   dentry, mode);
 #else
-	return create_vfs_mkdir_fn(d_inode(path->dentry), dentry, mode);
+	return SUSFS_ICALL(create_vfs_mkdir_fn, d_inode(path->dentry), dentry, mode);
 #endif
 }
 
@@ -216,24 +217,24 @@ static __nocfi noinline long create_takeover_mkdirat(int dfd,
 	if (!create_takeover_ready)
 		return -ENOSYS;
 
-	name = create_getname_fn(pathname, 0, NULL);
+	name = SUSFS_ICALL(create_getname_fn, pathname, 0, NULL);
 	if (IS_ERR(name))
 		return PTR_ERR(name);
 
-	err = create_filename_parentat_fn(dfd, name, 0, &path, &last, &type, NULL);
+	err = SUSFS_ICALL(create_filename_parentat_fn, dfd, name, 0, &path, &last, &type, NULL);
 	if (err) {
-		create_putname_fn(name);
+		SUSFS_ICALL(create_putname_fn, name);
 		return err;
 	}
 	if (type != LAST_NORM) {
 		path_put(&path);
-		create_putname_fn(name);
+		SUSFS_ICALL(create_putname_fn, name);
 		return -EINVAL;
 	}
 
 	err2 = mnt_want_write(path.mnt);
 	inode_lock_nested(d_inode(path.dentry), I_MUTEX_PARENT);
-	dentry = create_lookup_one_qstr_excl_fn(&last, path.dentry,
+	dentry = SUSFS_ICALL(create_lookup_one_qstr_excl_fn, &last, path.dentry,
 						LOOKUP_CREATE | LOOKUP_EXCL);
 	if (IS_ERR(dentry)) {
 		err = PTR_ERR(dentry);
@@ -241,7 +242,7 @@ static __nocfi noinline long create_takeover_mkdirat(int dfd,
 		if (!err2)
 			mnt_drop_write(path.mnt);
 		path_put(&path);
-		create_putname_fn(name);
+		SUSFS_ICALL(create_putname_fn, name);
 		return err;
 	}
 
@@ -252,7 +253,7 @@ static __nocfi noinline long create_takeover_mkdirat(int dfd,
 		if (!err2)
 			mnt_drop_write(path.mnt);
 		path_put(&path);
-		create_putname_fn(name);
+		SUSFS_ICALL(create_putname_fn, name);
 		return hidden ? -EACCES : -EEXIST;
 	}
 
@@ -260,18 +261,18 @@ static __nocfi noinline long create_takeover_mkdirat(int dfd,
 		dput(dentry);
 		inode_unlock(d_inode(path.dentry));
 		path_put(&path);
-		create_putname_fn(name);
+		SUSFS_ICALL(create_putname_fn, name);
 		return err2;
 	}
 
 	err = create_security_path_mkdir_fn ?
-		create_security_path_mkdir_fn(&path, dentry,
+		SUSFS_ICALL(create_security_path_mkdir_fn, &path, dentry,
 					      create_strip_umask(d_inode(path.dentry), mode)) : 0;
 	if (!err)
 		err = create_call_vfs_mkdir(&path, dentry, mode);
 
-	create_done_path_create_fn(&path, dentry);
-	create_putname_fn(name);
+	SUSFS_ICALL(create_done_path_create_fn, &path, dentry);
+	SUSFS_ICALL(create_putname_fn, name);
 	return err;
 }
 
@@ -290,7 +291,7 @@ static __nocfi noinline long create_wrap_mknodat(const struct pt_regs *regs)
 		return -ENOSYS;
 	if (create_name_hidden((int)susfs_sc_arg(regs, 0), (const char __user *)susfs_sc_arg(regs, 1)))
 		return -EACCES;
-	return orig(regs);
+	return SUSFS_ICALL(orig, regs);
 }
 
 static __nocfi noinline long create_wrap_symlinkat(const struct pt_regs *regs)
@@ -302,7 +303,7 @@ static __nocfi noinline long create_wrap_symlinkat(const struct pt_regs *regs)
 		return -ENOSYS;
 	if (create_name_hidden((int)susfs_sc_arg(regs, 1), (const char __user *)susfs_sc_arg(regs, 2)))
 		return -EACCES;
-	return orig(regs);
+	return SUSFS_ICALL(orig, regs);
 }
 
 static __nocfi noinline long create_wrap_linkat(const struct pt_regs *regs)
@@ -318,7 +319,7 @@ static __nocfi noinline long create_wrap_linkat(const struct pt_regs *regs)
 		return -ENOENT;
 	if (create_name_hidden((int)susfs_sc_arg(regs, 2), (const char __user *)susfs_sc_arg(regs, 3)))
 		return -EACCES;
-	return orig(regs);
+	return SUSFS_ICALL(orig, regs);
 }
 
 #ifdef __aarch64__
@@ -337,7 +338,7 @@ static __nocfi noinline long create_wrap_compat_mknodat(const struct pt_regs *re
 		return -ENOSYS;
 	if (create_name_hidden((int)susfs_sc_arg(regs, 0), (const char __user *)susfs_sc_arg(regs, 1)))
 		return -EACCES;
-	return orig(regs);
+	return SUSFS_ICALL(orig, regs);
 }
 
 static __nocfi noinline long create_wrap_compat_symlinkat(const struct pt_regs *regs)
@@ -348,7 +349,7 @@ static __nocfi noinline long create_wrap_compat_symlinkat(const struct pt_regs *
 		return -ENOSYS;
 	if (create_name_hidden((int)susfs_sc_arg(regs, 1), (const char __user *)susfs_sc_arg(regs, 2)))
 		return -EACCES;
-	return orig(regs);
+	return SUSFS_ICALL(orig, regs);
 }
 
 static __nocfi noinline long create_wrap_compat_linkat(const struct pt_regs *regs)
@@ -361,7 +362,7 @@ static __nocfi noinline long create_wrap_compat_linkat(const struct pt_regs *reg
 		return -ENOENT;
 	if (create_name_hidden((int)susfs_sc_arg(regs, 2), (const char __user *)susfs_sc_arg(regs, 3)))
 		return -EACCES;
-	return orig(regs);
+	return SUSFS_ICALL(orig, regs);
 }
 #define CREATE_COMPAT(w) (w)
 #else

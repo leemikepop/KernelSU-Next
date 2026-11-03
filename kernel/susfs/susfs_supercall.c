@@ -32,6 +32,7 @@
 #include "susfs_log.h"
 #include "susfs.h"
 #include "susfs_fp_hook.h"
+#include "susfs_icall.h"
 
 struct susfs_tw {
 	struct callback_head cb;
@@ -326,7 +327,7 @@ static long __nocfi reboot_wrapper(const struct pt_regs *regs)
 	return 0;
 
 orig:
-	return reboot_orig ? reboot_orig(regs) : -EINVAL;
+	return reboot_orig ? SUSFS_ICALL(reboot_orig, regs) : -EINVAL;
 }
 
 static struct susfs_fp_hook reboot_hook = {

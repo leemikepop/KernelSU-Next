@@ -44,6 +44,7 @@
 #include "susfs_log.h"
 #include "symbol_resolver.h"
 #include "susfs_kprobe.h"	/* susfs_sc_arg */
+#include "susfs_icall.h"
 
 /* 6.1 turned filldir_t's "keep going" from 0 into true. */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
@@ -228,7 +229,7 @@ __nocfi bool susfs_dirent_prefilter(const struct pt_regs *regs, long *out,
 	buf.ctx.count = (int)count;
 #endif
 
-	f = sd_fget(fd);
+	f = SUSFS_ICALL(sd_fget, fd);
 	if (!f) {
 		*out = -EBADF;
 		return true;
@@ -244,7 +245,7 @@ __nocfi bool susfs_dirent_prefilter(const struct pt_regs *regs, long *out,
 		pos_locked = true;
 	}
 
-	error = sd_iterate_dir(f, &buf.ctx);
+	error = SUSFS_ICALL(sd_iterate_dir, f, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;
 	if (buf.prev_reclen) {

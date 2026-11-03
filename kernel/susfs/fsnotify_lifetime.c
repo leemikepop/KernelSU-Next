@@ -13,6 +13,7 @@
 
 #include "btf_layout.h"
 #include "fsnotify_lifetime.h"
+#include "susfs_icall.h"
 #include "symbol_resolver.h"
 
 struct fsnotify_group;
@@ -49,41 +50,41 @@ static void (*susfs_wait_marks_fn)(void);
 static struct fsnotify_group *__nocfi susfs_alloc_group(void)
 {
     if (susfs_alloc_with_flags)
-        return ((struct fsnotify_group *(*)(const struct fsnotify_ops *, int))
-                    susfs_alloc_group_fn)(susfs_watch_ops, 0);
-    return ((struct fsnotify_group *(*)(const struct fsnotify_ops *))
-                susfs_alloc_group_fn)(susfs_watch_ops);
+        return SUSFS_ICALL((struct fsnotify_group *(*)(const struct fsnotify_ops *, int))
+                           susfs_alloc_group_fn, susfs_watch_ops, 0);
+    return SUSFS_ICALL((struct fsnotify_group *(*)(const struct fsnotify_ops *))
+                       susfs_alloc_group_fn, susfs_watch_ops);
 }
 
 static void __nocfi susfs_init_mark(struct fsnotify_mark *mark)
 {
-    susfs_init_mark_fn(mark, susfs_watch_group);
+    SUSFS_ICALL(susfs_init_mark_fn, mark, susfs_watch_group);
 }
 
 static int __nocfi susfs_add_mark(struct fsnotify_mark *mark, struct super_block *sb)
 {
     if (susfs_add_with_object)
-        return ((int (*)(struct fsnotify_mark *, void *, unsigned int, int))
-                    susfs_add_mark_fn)(mark, sb, susfs_sb_object_type, 0);
-    return ((int (*)(struct fsnotify_mark *, struct fsnotify_mark_connector **,
-                    unsigned int, int, void *))susfs_add_mark_fn)
-        (mark, (void *)((char *)sb + susfs_sb_marks_offset),
-         susfs_sb_object_type, 0, NULL);
+        return SUSFS_ICALL((int (*)(struct fsnotify_mark *, void *, unsigned int, int))
+                           susfs_add_mark_fn, mark, sb, susfs_sb_object_type, 0);
+    return SUSFS_ICALL((int (*)(struct fsnotify_mark *, struct fsnotify_mark_connector **,
+                                unsigned int, int, void *))susfs_add_mark_fn,
+                       mark, (void *)((char *)sb + susfs_sb_marks_offset),
+                       susfs_sb_object_type, 0, NULL);
 }
 
 static void __nocfi susfs_put_mark(struct fsnotify_mark *mark)
 {
-    susfs_put_mark_fn(mark);
+    SUSFS_ICALL(susfs_put_mark_fn, mark);
 }
 
 static void __nocfi susfs_destroy_group(struct fsnotify_group *group)
 {
-    susfs_destroy_group_fn(group);
+    SUSFS_ICALL(susfs_destroy_group_fn, group);
 }
 
 static void __nocfi susfs_wait_marks(void)
 {
-    susfs_wait_marks_fn();
+    SUSFS_ICALL(susfs_wait_marks_fn);
 }
 
 static struct susfs_sb_watch *susfs_watch_from_mark(struct fsnotify_mark *mark)

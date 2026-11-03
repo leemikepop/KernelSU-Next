@@ -36,6 +36,7 @@
 #include "susfs_kprobe.h"
 #include "patch_memory.h"
 #include "susfs_fp_hook.h"	/* susfs_fp_drain: wait out in-flight wrappers */
+#include "susfs_icall.h"
 
 #define SUS_MAP_MAX 64
 
@@ -284,7 +285,7 @@ static int __nocfi sus_map_show_map_wrap(struct seq_file *m, void *v)
 	 * probe version that skipped the body (no timing fingerprint). */
 	if (sus_map_hide_vma((struct vm_area_struct *)v, "show_map"))
 		return 0;
-	return sus_map_orig_show(m, v);
+	return SUSFS_ICALL(sus_map_orig_show, m, v);
 }
 
 static int __nocfi sus_map_show_smap_wrap(struct seq_file *m, void *v)
@@ -293,7 +294,7 @@ static int __nocfi sus_map_show_smap_wrap(struct seq_file *m, void *v)
 		return -EINVAL;
 	if (sus_map_hide_vma((struct vm_area_struct *)v, "show_smap"))
 		return 0;
-	return sus_map_orig_smap(m, v);
+	return SUSFS_ICALL(sus_map_orig_smap, m, v);
 }
 
 static struct kprobe kp_map = {

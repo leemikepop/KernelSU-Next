@@ -9,6 +9,7 @@
 
 #include "patch_memory.h"
 #include "susfs_log.h"
+#include "susfs_icall.h"
 #include "symbol_resolver.h"
 #include <linux/cpumask.h>
 #include <linux/gfp.h>
@@ -108,15 +109,15 @@ int ksu_patch_memory_init(void)
 static __nocfi noinline void ksu_flush_dcache(unsigned long start, size_t sz)
 {
     if (ksu_dcache_new_fn)
-        ksu_dcache_new_fn(start, start + sz);
+        SUSFS_ICALL(ksu_dcache_new_fn, start, start + sz);
     else if (ksu_dcache_old_fn)
-        ksu_dcache_old_fn((void *)start, sz);
+        SUSFS_ICALL(ksu_dcache_old_fn, (void *)start, sz);
 }
 
 static __nocfi noinline void ksu_flush_icache(unsigned long start, unsigned long end)
 {
     if (ksu_icache_fn)
-        ksu_icache_fn(start, end);
+        SUSFS_ICALL(ksu_icache_fn, start, end);
 }
 
 struct patch_text_info {

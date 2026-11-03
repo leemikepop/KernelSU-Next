@@ -72,6 +72,7 @@
 #include "susfs_fp_hook.h"
 #include "susfs_or_entry.h"	/* open_redirect's name layer shares exactly these five entries */
 #include "ksu_allow_gate.h"	/* the control-node gate is su's own */
+#include "susfs_icall.h"
 
 /* The AArch32 numbers.  No arm64 header defines them as __NR_*: they are what
  * arch/arm64/include/asm/unistd32.h is generated from, i.e.
@@ -174,14 +175,14 @@ static __nocfi struct file *opath_take_fd(unsigned int fd)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 	if (opath_close_fd)
-		return opath_close_fd(fd);
+		return SUSFS_ICALL(opath_close_fd, fd);
 #else
 	/* Declared inside this arm on purpose: the 6.1+ helper returns the file itself, so the
 	 * out-parameter this one is called with does not exist on those kernels and a variable for
 	 * it there is -Wunused-variable under the build's -Werror. */
 	struct file *f = NULL;
 
-	if (opath_close_fd_get_file && !opath_close_fd_get_file(fd, &f))
+	if (opath_close_fd_get_file && !SUSFS_ICALL(opath_close_fd_get_file, fd, &f))
 		return f;
 #endif
 	return NULL;
@@ -265,7 +266,7 @@ __nocfi long susfs_opath_post_fd(long ret)
 	 * (fs/open.c:801-805), so fget() answers NULL for precisely the files this layer has to
 	 * look at, and the check below would never see one.  fget_raw() passes mask 0
 	 * (fs/file.c:927-931) and takes any fd. */
-	f = opath_fget_raw((unsigned int)ret);
+	f = SUSFS_ICALL(opath_fget_raw, (unsigned int)ret);
 	if (!f)
 		return ret;
 
@@ -395,7 +396,7 @@ __nocfi long susfs_opath_post_fd(long ret)
 		 * whichever of the two produced it (and a negative errno passes straight through	\
 		 * that function, which leaves anything that is not an fd alone). */		\
 		if (or_hook) {						\
-			ret = or_hook(regs, (kind));			\
+			ret = SUSFS_ICALL(or_hook, regs, (kind));			\
 			if (ret != SUSFS_OR_ENTRY_PASS) {		\
 				if ((flags_reg) >= 0 && ret >= 0 &&	\
 				    !(susfs_sc_arg(regs, flags_reg) & O_PATH))	\
@@ -403,7 +404,7 @@ __nocfi long susfs_opath_post_fd(long ret)
 				return susfs_opath_post_fd(ret);	\
 			}						\
 		}							\
-		ret = orig(regs);					\
+		ret = SUSFS_ICALL(orig, regs);					\
 		if ((flags_reg) >= 0 && !(susfs_sc_arg(regs, flags_reg) & O_PATH))	\
 			return ret;					\
 		return susfs_opath_post_fd(ret);			\

@@ -63,6 +63,7 @@
 #include "symbol_resolver.h"
 #include "susfs_kprobe.h"	/* susfs_sc_arg */
 #include "susfs_or_entry.h"
+#include "susfs_icall.h"
 
 /* include/uapi/linux/openat2.h: three u64 fields, identical on both ABIs we build for. */
 struct susfs_open_how {
@@ -164,7 +165,7 @@ susfs_or_entry_fn_t susfs_or_entry_hook;
 static __nocfi noinline void or_fsnotify_open(struct file *file)
 {
 	if (or_fsnotify_open_fn)
-		or_fsnotify_open_fn(file);
+		SUSFS_ICALL(or_fsnotify_open_fn, file);
 }
 
 /* Same shape for copy_struct_from_user()'s zero check: it is the helper openat2 uses to accept a
@@ -172,14 +173,14 @@ static __nocfi noinline void or_fsnotify_open(struct file *file)
  * calls it is not. */
 static __nocfi noinline int or_check_zeroed_user(const void __user *from, unsigned long count)
 {
-	return or_check_zeroed_user_fn(from, count);
+	return SUSFS_ICALL(or_check_zeroed_user_fn, from, count);
 }
 
 /* The undo of get_unused_fd_flags(): needed to keep the kernel's own order (descriptor first, file
  * second), where a failed open leaves nothing behind. */
 static __nocfi noinline void or_put_unused_fd(unsigned int fd)
 {
-	or_put_unused_fd_fn(fd);
+	SUSFS_ICALL(or_put_unused_fd_fn, fd);
 }
 
 /* The original syscall is not called at all when this redirects, so nothing has to be undone if the
@@ -378,15 +379,15 @@ static __nocfi noinline long or_entry_redirect(const struct pt_regs *regs, int k
 	 * paths carry a rule (write a symlink to the path and open it with O_NOFOLLOW).  A path that
 	 * does not resolve (O_CREAT of a new file) cannot be the target of a rule, so the kernel is
 	 * left to answer it. */
-	name = or_getname_flags_fn(uname, 0, NULL);
+	name = SUSFS_ICALL(or_getname_flags_fn, uname, 0, NULL);
 	if (IS_ERR(name))
 		return SUSFS_OR_ENTRY_PASS;
-	res = or_filename_lookup_fn(dfd, name, or_lookup_flags(flags, resolve), &path, NULL);
+	res = SUSFS_ICALL(or_filename_lookup_fn, dfd, name, or_lookup_flags(flags, resolve), &path, NULL);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
 	/* filename_lookup() consumed `name` through 5.14; 5.15 made the caller own it.
 	 * Putting it here again double-frees and panics (the create_gate 5.10 KE). */
 #else
-	or_putname_fn(name);
+	SUSFS_ICALL(or_putname_fn, name);
 #endif
 	if (res)
 		return SUSFS_OR_ENTRY_PASS;
@@ -421,11 +422,11 @@ static __nocfi noinline long or_entry_redirect(const struct pt_regs *regs, int k
 	/* The descriptor is taken BEFORE the file is opened, which is the order do_sys_openat2() uses:
 	 * an EMFILE/ENFILE open then touches nothing at all, where opening first would have created or
 	 * truncated the rule's target and then failed anyway. */
-	fd = or_get_unused_fd_flags_fn(fd_cloexec);
+	fd = SUSFS_ICALL(or_get_unused_fd_flags_fn, fd_cloexec);
 	if (fd < 0)
 		return fd;
 
-	f = or_filp_open_fn(target, (int)(flags & ~O_CLOEXEC), (umode_t)mode);
+	f = SUSFS_ICALL(or_filp_open_fn, target, (int)(flags & ~O_CLOEXEC), (umode_t)mode);
 	if (IS_ERR(f)) {
 		or_put_unused_fd((unsigned)fd);
 		return PTR_ERR(f);
@@ -443,7 +444,7 @@ static __nocfi noinline long or_entry_redirect(const struct pt_regs *regs, int k
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
 	or_fsnotify_open(f);
 #endif
-	or_fd_install_fn((unsigned)fd, f);
+	SUSFS_ICALL(or_fd_install_fn, (unsigned)fd, f);
 
 	atomic_inc(&or_entry_hits);
 	return fd;

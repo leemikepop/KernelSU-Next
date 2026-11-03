@@ -149,6 +149,7 @@
 #include "susfs.h"	/* module-wide declarations */
 #include "ksu_allow_gate.h"	/* the control-node gate is su's own */
 #include "susfs_kprobe.h"
+#include "susfs_icall.h"
 
 /* ---- the "which mounts are ours" prefix list: state ----
  * Up here, not next to the control surface further down, because mount_stat() between
@@ -279,7 +280,7 @@ static __nocfi bool sus_mount_is_su_domain(void)
         return false;
     /* kprobe pre_handler runs on the probed task with preemption disabled:
      * reading current->cred and the LSM hook list never sleeps. */
-    pfn_security_cred_getsecid(current_cred(), &sid);
+    SUSFS_ICALL(pfn_security_cred_getsecid, current_cred(), &sid);
     return sid == su_sid;
 }
 
@@ -295,14 +296,27 @@ static __nocfi int sus_mount_ida_alloc(void)
     u32 id = 0;
     int ret;
 
+#ifdef CONFIG_X86_64
+    /* SUSFS_ICALL passes integer arguments only.  struct xa_limit (two u32) is passed in a
+     * single register holding its eight bytes, so pass exactly those bytes. */
+    unsigned long limit_bits;
+
+    BUILD_BUG_ON(sizeof(limit) != sizeof(limit_bits));
+    memcpy(&limit_bits, &limit, sizeof(limit_bits));
+    xa_lock(sus_mount_mnt_id_xa);
+    ret = SUSFS_ICALL((int (*)(struct xarray *, u32 *, void *, unsigned long, gfp_t))pfn_xa_alloc,
+                      sus_mount_mnt_id_xa, &id, NULL, limit_bits, GFP_KERNEL);
+    xa_unlock(sus_mount_mnt_id_xa);
+#else
     xa_lock(sus_mount_mnt_id_xa);
     ret = pfn_xa_alloc(sus_mount_mnt_id_xa, &id, NULL, limit, GFP_KERNEL);
     xa_unlock(sus_mount_mnt_id_xa);
+#endif
     if (ret)
         return ret;
     return (int)id;
 #else
-    return pfn_ida_alloc_range(sus_mount_mnt_id_ida,
+    return SUSFS_ICALL(pfn_ida_alloc_range, sus_mount_mnt_id_ida,
                                (unsigned int)DEFAULT_KSU_MNT_ID,
                                (unsigned int)(INT_MAX - 1), GFP_KERNEL);
 #endif
@@ -323,10 +337,10 @@ static __nocfi void sus_mount_ida_release(int id)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
     xa_lock(sus_mount_mnt_id_xa);
-    pfn_xa_erase(sus_mount_mnt_id_xa, (unsigned long)(unsigned int)id);
+    SUSFS_ICALL(pfn_xa_erase, sus_mount_mnt_id_xa, (unsigned long)(unsigned int)id);
     xa_unlock(sus_mount_mnt_id_xa);
 #else
-    pfn_ida_free(sus_mount_mnt_id_ida, (unsigned int)id);
+    SUSFS_ICALL(pfn_ida_free, sus_mount_mnt_id_ida, (unsigned int)id);
 #endif
 }
 
@@ -334,7 +348,7 @@ static __nocfi char *sus_mount_d_path(const struct path *path, char *buf, int bu
 {
     if (!pfn_d_path)
         return ERR_PTR(-ENOSYS);
-    return pfn_d_path(path, buf, buflen);
+    return SUSFS_ICALL(pfn_d_path, path, buf, buflen);
 }
 
 /* Effective threshold: clamped on every read too, because the sysfs knob can be
@@ -878,7 +892,7 @@ static DECLARE_WORK(sus_mount_learn_wq, sus_mount_learn_work);
 
 static __nocfi void sus_mount_put_mnt_ns(struct mnt_namespace *ns)
 {
-    pfn_put_mnt_ns(ns);
+    SUSFS_ICALL(pfn_put_mnt_ns, ns);
 }
 
 /* One recorded namespace, or NULL when the ring is empty. */

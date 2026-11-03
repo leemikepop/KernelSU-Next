@@ -59,6 +59,7 @@
 
 #include "lsm_hook.h"
 #include "fsnotify_lifetime.h"
+#include "susfs_icall.h"
 
 /* Bounce buffer for the dirent rewrite: one record at a time, so only a single
  * record - not a whole listing - has to fit; one that does not fit is left
@@ -951,79 +952,79 @@ static struct ksu_lsm_hook sus_path_link_hook =
 
 SUS_LSM_ORIG_CALL(inode_getattr, const struct path *path)
 {
-	return fn(path);
+	return SUSFS_ICALL(fn, path);
 }
 
 SUS_LSM_ORIG_CALL(inode_permission, struct inode *inode, int mask)
 {
-	return fn(inode, mask);
+	return SUSFS_ICALL(fn, inode, mask);
 }
 
 SUS_LSM_ORIG_CALL(inode_readlink, struct dentry *dentry)
 {
-	return fn(dentry);
+	return SUSFS_ICALL(fn, dentry);
 }
 
 SUS_LSM_ORIG_CALL(inode_unlink, struct inode *dir, struct dentry *dentry)
 {
-	return fn(dir, dentry);
+	return SUSFS_ICALL(fn, dir, dentry);
 }
 
 SUS_LSM_ORIG_CALL(inode_rmdir, struct inode *dir, struct dentry *dentry)
 {
-	return fn(dir, dentry);
+	return SUSFS_ICALL(fn, dir, dentry);
 }
 
 SUS_LSM_ORIG_CALL(inode_rename, struct inode *old_dir, struct dentry *old_dentry,
 		  struct inode *new_dir, struct dentry *new_dentry)
 {
-	return fn(old_dir, old_dentry, new_dir, new_dentry);
+	return SUSFS_ICALL(fn, old_dir, old_dentry, new_dir, new_dentry);
 }
 
 SUS_LSM_ORIG_CALL(inode_link, struct dentry *old_dentry, struct inode *dir,
 		  struct dentry *new_dentry)
 {
-	return fn(old_dentry, dir, new_dentry);
+	return SUSFS_ICALL(fn, old_dentry, dir, new_dentry);
 }
 
 SUS_LSM_ORIG_CALL(sb_statfs, struct dentry *dentry)
 {
-	return fn(dentry);
+	return SUSFS_ICALL(fn, dentry);
 }
 
 SUS_LSM_ORIG_CALL(inode_setattr, SUS_SETATTR_MNT_ID_DECL
 		  struct dentry *dentry, struct iattr *attr)
 {
-	return fn(SUS_SETATTR_MNT_ID_ARG dentry, attr);
+	return SUSFS_ICALL(fn, SUS_SETATTR_MNT_ID_ARG dentry, attr);
 }
 
 SUS_LSM_ORIG_CALL(inode_getxattr, struct dentry *dentry, const char *name)
 {
-	return fn(dentry, name);
+	return SUSFS_ICALL(fn, dentry, name);
 }
 
 SUS_LSM_ORIG_CALL(inode_listxattr, struct dentry *dentry)
 {
-	return fn(dentry);
+	return SUSFS_ICALL(fn, dentry);
 }
 
 SUS_LSM_ORIG_CALL(inode_setxattr, SUS_XATTR_MNT_ID_DECL
 		  struct dentry *dentry, const char *name, const void *value,
 		  size_t size, int flags)
 {
-	return fn(SUS_XATTR_MNT_ID_ARG dentry, name, value, size, flags);
+	return SUSFS_ICALL(fn, SUS_XATTR_MNT_ID_ARG dentry, name, value, size, flags);
 }
 
 SUS_LSM_ORIG_CALL(inode_removexattr, SUS_XATTR_MNT_ID_DECL
 		  struct dentry *dentry, const char *name)
 {
-	return fn(SUS_XATTR_MNT_ID_ARG dentry, name);
+	return SUSFS_ICALL(fn, SUS_XATTR_MNT_ID_ARG dentry, name);
 }
 
 SUS_LSM_ORIG_CALL(path_notify, const struct path *path, u64 mask,
 		  unsigned int obj_type)
 {
-	return fn(path, mask, obj_type);
+	return SUSFS_ICALL(fn, path, mask, obj_type);
 }
 #endif	/* >= 6.12: the slot-takeover path is the only one that calls an original */
 
@@ -1333,7 +1334,7 @@ static __nocfi noinline int sus_path_call_orig_readlink(const struct inode_opera
 							struct dentry *dentry,
 							char __user *buf, int buflen)
 {
-    return orig->readlink(dentry, buf, buflen);
+    return SUSFS_ICALL(orig->readlink, dentry, buf, buflen);
 }
 
 /* Find the original i_op behind one of our copies (NULL if it is not ours).  The list

@@ -43,6 +43,7 @@
 #include "susfs_log.h"
 #include "susfs_kprobe.h"	/* SUSFS_SC_WRAPPER_NAME for the log control symbol */
 #include "susfs_fp_hook.h"
+#include "susfs_icall.h"
 
 /* The generated x86_64 unistd headers of the 5.10 KMIs do not define
  * __NR_syscalls (android13-5.15 and up do); they carry __NR_syscall_max
@@ -392,7 +393,7 @@ static bool fp_sync_looked_up;
 
 static __nocfi void fp_call_drain(void (*fn)(void))
 {
-	fn();
+	SUSFS_ICALL(fn);
 }
 
 void susfs_fp_drain(void)

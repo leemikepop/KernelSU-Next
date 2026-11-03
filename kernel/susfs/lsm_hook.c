@@ -39,6 +39,7 @@
 #include "lsm_hook.h"
 #include "patch_memory.h"
 #include "susfs_log.h"
+#include "susfs_icall.h"
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 #include <linux/static_call.h>		/* __static_call_update() - EXPORT_SYMBOL_GPL */
 #include <linux/static_call_types.h>	/* struct static_call_key */
@@ -388,7 +389,7 @@ static void (*ksu_static_call_update_fn)(struct static_call_key *key, void *tram
 
 static __nocfi void ksu_lsm_call_scall_update(struct static_call_key *key, void *tramp, void *func)
 {
-    ksu_static_call_update_fn(key, tramp, func);
+    SUSFS_ICALL(ksu_static_call_update_fn, key, tramp, func);
 }
 
 static int ksu_lsm_hook_update_scall(struct lsm_static_call *scall, void *value)
@@ -1257,7 +1258,7 @@ static bool ksu_lsm_sync_looked_up;
 
 static __nocfi void ksu_lsm_call_drain(void (*fn)(void))
 {
-    fn();
+    SUSFS_ICALL(fn);
 }
 
 static void ksu_lsm_hook_drain(void)

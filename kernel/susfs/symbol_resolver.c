@@ -16,6 +16,7 @@
  */
 #include "symbol_resolver.h"
 #include "susfs_log.h"
+#include "susfs_icall.h"
 #include <linux/kallsyms.h>
 #include <linux/kprobes.h>
 #include <linux/module.h>
@@ -180,7 +181,7 @@ unsigned long __nocfi find_kernel_symbol_exact(const char *symbol_name)
 #if HAVE_ON_EACH_MATCH_SYMBOL
     /* 6.1+ can match the exact name, but carries no ownership check - tried first only. */
     if (likely(kallsyms_on_each_match_symbol_fn)) {
-        kallsyms_on_each_match_symbol_fn(find_kernel_symbol_exact_cb, symbol_name, &addr);
+        SUSFS_ICALL(kallsyms_on_each_match_symbol_fn, find_kernel_symbol_exact_cb, symbol_name, &addr);
         return addr;
     }
 #endif
@@ -190,7 +191,7 @@ unsigned long __nocfi find_kernel_symbol_exact(const char *symbol_name)
     if (unlikely(!kallsyms_lookup_name_fn))
         return 0;
 
-    addr = kallsyms_lookup_name_fn(symbol_name);
+    addr = SUSFS_ICALL(kallsyms_lookup_name_fn, symbol_name);
     if (!addr)
         return 0;	/* walking kallsyms for address 0 answers nothing */
 
@@ -201,7 +202,7 @@ unsigned long __nocfi find_kernel_symbol_exact(const char *symbol_name)
         char *module_name = NULL;
         char buf[KSYM_SYMBOL_LEN];
 
-        kallsyms_lookup_fn(addr, NULL, NULL, &module_name, buf);
+        SUSFS_ICALL(kallsyms_lookup_fn, addr, NULL, NULL, &module_name, buf);
         if (unlikely(module_name)) {
             pr_warn("ignore symbol %s of module %s\n", symbol_name, module_name);
             return 0;
@@ -216,7 +217,7 @@ unsigned long __nocfi find_kernel_symbol_exact(const char *symbol_name)
     if (kallsyms_on_each_symbol_fn) {
         struct ksu_exact_name_ctx ctx = { .symbol_name = symbol_name };
 
-        kallsyms_on_each_symbol_fn(ksu_exact_name_cb, &ctx);
+        SUSFS_ICALL(kallsyms_on_each_symbol_fn, ksu_exact_name_cb, &ctx);
         if (ctx.addr != addr) {
             pr_warn("ignore symbol %s: the kallsyms walk did not confirm it as vmlinux's\n", symbol_name);
             return 0;
@@ -241,7 +242,7 @@ unsigned long __nocfi ksu_kallsyms_lookup_name(const char *name)
 	if (!name || !name[0] || unlikely(!kallsyms_lookup_name_fn))
 		return 0;
 
-	return kallsyms_lookup_name_fn(name);
+	return SUSFS_ICALL(kallsyms_lookup_name_fn, name);
 }
 
 /* Collect EVERY vmlinux symbol with this exact name, not just the first one.
@@ -267,7 +268,7 @@ int __nocfi ksu_find_symbol_all(const char *name, unsigned long *addrs, int max)
     if (kallsyms_on_each_symbol_fn) {
         struct ksu_all_names_ctx ctx = { .symbol_name = name, .addrs = addrs, .max = max, .n = 0 };
 
-        kallsyms_on_each_symbol_fn(ksu_all_names_cb, &ctx);
+        SUSFS_ICALL(kallsyms_on_each_symbol_fn, ksu_all_names_cb, &ctx);
         n = ctx.n;
     }
 
@@ -339,7 +340,7 @@ static __nocfi void *resolve_symbol_variant(const char *symbol_name, size_t symb
     if (unlikely(!kallsyms_on_each_symbol_fn))
         return NULL;
 
-    kallsyms_on_each_symbol_fn(lookup_symbol_variant_cb, &ctx);
+    SUSFS_ICALL(kallsyms_on_each_symbol_fn, lookup_symbol_variant_cb, &ctx);
 
     return ctx.match;
 }
@@ -447,7 +448,7 @@ int __nocfi ksu_symbol_is_start(unsigned long addr, const char *name)
 
     len = strlen(name);
     if (kallsyms_lookup_fn && len < sizeof(buf) &&
-        kallsyms_lookup_fn(addr, NULL, &offset, &modname, buf) && !modname && !offset &&
+        SUSFS_ICALL(kallsyms_lookup_fn, addr, NULL, &offset, &modname, buf) && !modname && !offset &&
         !strncmp(buf, name, len) && (!buf[len] || buf[len] == '.' || buf[len] == '$') &&
         !strstr(buf + len, ".cfi_jt"))
         return 1;
@@ -475,7 +476,7 @@ int __nocfi ksu_symbol_name_of(unsigned long addr, char *buf, char **module_out)
         return -ENOSYS;
     if (!addr)
         return -EINVAL;
-    if (!kallsyms_lookup_fn(addr, NULL, NULL, &modname, buf))
+    if (!SUSFS_ICALL(kallsyms_lookup_fn, addr, NULL, NULL, &modname, buf))
         return -ENOENT;
     if (module_out)
         *module_out = modname;

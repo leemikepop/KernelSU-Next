@@ -21,6 +21,7 @@
 #include "symbol_resolver.h"
 #include "susfs.h"		/* susfs_expose_proc: the warning below depends on it */
 #include "susfs_log.h"
+#include "susfs_icall.h"
 
 static const char *const ksu_allow_symbols[] = {
 	"__ksu_is_allow_uid_for_current",
@@ -51,7 +52,7 @@ bool __nocfi noinline susfs_ksu_allow_ask(uid_t uid)
 {
 	switch (READ_ONCE(susfs_ksu_allow_kind)) {
 	case 1:
-		return ksu_allow_fn(uid);
+		return SUSFS_ICALL(ksu_allow_fn, uid);
 	default:
 		/* Unreachable while the flag above says a source exists; the strict answer is the safe
 		 * one if the kind ever changes under a caller. */

@@ -61,6 +61,7 @@
 #include "ksu_allow_gate.h"	/* the control-node gate is su's own */
 #include "susfs_kprobe.h"
 #include "susfs_or_entry.h"	/* susfs_or_entry_armed(): the forward direction lives there now */
+#include "susfs_icall.h"
 
 #define SUS_OR_MAX 64
 /* The ABI fields are char[256]; matching that width stops a legal long path from being truncated into a rule for a
@@ -106,7 +107,7 @@ static __nocfi noinline int or_statfs_snapshot(const struct path *path, struct k
 {
 	if (!or_vfs_statfs_fn)
 		return -EOPNOTSUPP;
-	return or_vfs_statfs_fn(path, out);
+	return SUSFS_ICALL(or_vfs_statfs_fn, path, out);
 }
 
 struct sus_or_entry {
@@ -192,7 +193,7 @@ static __nocfi bool or_in_su_domain(void)
 	if (!or_cred_getsecid || !or_su_sid)
 		return false;
 	/* interrupt context: reading current->cred and walking the (static) LSM hook list never sleeps. */
-	or_cred_getsecid(current_cred(), &sid);
+	SUSFS_ICALL(or_cred_getsecid, current_cred(), &sid);
 	return sid == or_su_sid;
 }
 

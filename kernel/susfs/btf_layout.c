@@ -9,6 +9,7 @@
 
 #include "btf_layout.h"
 #include "symbol_resolver.h"
+#include "susfs_icall.h"
 
 struct btf;
 
@@ -22,17 +23,17 @@ static const struct btf_type *__nocfi susfs_btf_type(u32 id)
 {
     if (!id || id >= susfs_btf_count)
         return NULL;
-    return susfs_btf_type_fn(susfs_core_btf, id);
+    return SUSFS_ICALL(susfs_btf_type_fn, susfs_core_btf, id);
 }
 
 static const char *__nocfi susfs_btf_name(u32 offset)
 {
-    return susfs_btf_name_fn(susfs_core_btf, offset);
+    return SUSFS_ICALL(susfs_btf_name_fn, susfs_core_btf, offset);
 }
 
 static u32 __nocfi susfs_btf_type_count(void)
 {
-    return susfs_btf_count_fn(susfs_core_btf);
+    return SUSFS_ICALL(susfs_btf_count_fn, susfs_core_btf);
 }
 
 static u32 susfs_btf_unwrap(u32 id)

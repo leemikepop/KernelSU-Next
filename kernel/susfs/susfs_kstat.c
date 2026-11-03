@@ -57,6 +57,7 @@
 #include "ksu_umount_gate.h"	/* susfs_is_current_proc_umounted_app (issue #34) */
 #include "ksu_allow_gate.h"	/* the control-node gate is su's own */
 #include "susfs_kprobe.h"
+#include "susfs_icall.h"
 
 /* KSTAT_SPOOF_* bits live in susfs_abi.h (upstream declares them in susfs.h next to struct
  * st_susfs_sus_kstat).  KSTAT_AUTO_SPOOF* below are /proc-interface masks, not supercall ABI. */
@@ -1660,7 +1661,7 @@ static susfs_syscall_fn_t kstat_orig_compat_getdents;
 		 * syscall_get_arguments() asks for a non-const one it only reads - the	\
 		 * cast is what that difference costs, and nothing here writes regs. */	\
 		syscall_get_arguments(current, (struct pt_regs *)regs, a);	\
-		ret = orig(regs);					\
+		ret = SUSFS_ICALL(orig, regs);					\
 		out = ret;						\
 		susfs_kstat_post(nrval, combat, a, ret, &out);		\
 		return out;						\
@@ -1685,7 +1686,7 @@ static __nocfi long kstat_wrap_getdents64(const struct pt_regs *regs)
 	if (susfs_dirent_prefilter(regs, &out, false))
 		return out;
 	syscall_get_arguments(current, (struct pt_regs *)regs, a);
-	ret = orig(regs);
+	ret = SUSFS_ICALL(orig, regs);
 	out = ret;
 	susfs_kstat_post(__NR_getdents64, false, a, ret, &out);
 	return out;
@@ -1713,7 +1714,7 @@ static __nocfi long kstat_wrap_compat_getdents64(const struct pt_regs *regs)
 	if (susfs_dirent_prefilter(regs, &out, false))
 		return out;
 	syscall_get_arguments(current, (struct pt_regs *)regs, a);
-	ret = orig(regs);
+	ret = SUSFS_ICALL(orig, regs);
 	out = ret;
 	susfs_kstat_post(SUS_NR_GETDENTS64_COMPAT, true, a, ret, &out);
 	return out;
@@ -1730,7 +1731,7 @@ static __nocfi long kstat_wrap_compat_getdents(const struct pt_regs *regs)
 	if (susfs_dirent_prefilter(regs, &out, true))
 		return out;
 	syscall_get_arguments(current, (struct pt_regs *)regs, a);
-	ret = orig(regs);
+	ret = SUSFS_ICALL(orig, regs);
 	out = ret;
 	susfs_kstat_post(SUS_NR_GETDENTS_COMPAT, true, a, ret, &out);
 	return out;

@@ -28,6 +28,7 @@
 #include "ksu_umount_gate.h"
 #include "symbol_resolver.h"
 #include "susfs_log.h"
+#include "susfs_icall.h"
 
 #define KSU_UMOUNT_GATE_SYMBOL	"ksu_uid_should_umount"
 
@@ -47,7 +48,7 @@ static bool (*ksu_uid_should_umount_fn)(uid_t uid);
  * LTO would otherwise inline a small static helper back into a caller that is not marked. */
 bool __nocfi noinline susfs_ksu_umount_ask(uid_t uid)
 {
-	return ksu_uid_should_umount_fn(uid);
+	return SUSFS_ICALL(ksu_uid_should_umount_fn, uid);
 }
 
 int susfs_ksu_umount_gate_init(void)
