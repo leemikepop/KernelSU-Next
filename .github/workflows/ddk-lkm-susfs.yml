@@ -129,6 +129,15 @@ jobs:
           llvm-strip -d "$OUT_DIR/$OUTPUT_NAME"
           echo "Size after stripping: $(du -h "$OUT_DIR/$OUTPUT_NAME" | cut -f1)"
           
+      # x86 6.2+ kernels rewrite the bytes in front of indirect calls at load time when they
+      # look like a kCFI sequence; every unchecked call must go through SUSFS_ICALL's
+      # trampoline, and checked calls may only target the module's own functions.
+      - name: Check x64 susfs_guard_lkm.ko against the kCFI call-site rewrite
+        run: |
+          python3 kernel/susfs/tools/x86_icall_windows.py \
+            --allow init_module,susfs_layers_down,susfs_tw_func,susfs_watch_freeing \
+            "/github/workspace/out/x86_64/${{ inputs.kmi }}_susfs_guard_lkm.ko"
+
       - name: Upload x64 susfs_guard_lkm.ko artifact
         uses: actions/upload-artifact@v7
         with:
