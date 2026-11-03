@@ -6,6 +6,7 @@
 #include <linux/mutex.h>
 #include <linux/nospec.h>
 #include <asm/cacheflush.h>
+#include "infra/icall.h"
 #include "infra/symbol_resolver.h"
 #include "../patch_memory.h"
 #include "arch.h"
@@ -168,7 +169,7 @@ static long __nocfi ksu_syscall_dispatcher(const struct pt_regs *regs)
     if (likely(orig_nr >= 0 && orig_nr < __NR_syscalls)) {
         ksu_syscall_hook_fn fn = READ_ONCE(syscall_hooks[orig_nr]);
         if (likely(fn))
-            return fn(orig_nr, regs);
+            return KSU_ICALL(fn, orig_nr, regs);
     }
 
     return -ENOSYS;

@@ -8,6 +8,7 @@
 #include <linux/string.h>
 #include <linux/version.h>
 
+#include "infra/icall.h"
 #include "infra/symbol_resolver.h"
 
 // https://github.com/torvalds/linux/commit/89245600941e4e0f87d77f60ee269b5e61ef4e49
@@ -64,7 +65,7 @@ unsigned long __nocfi find_kernel_symbol_exact(const char *symbol_name)
     unsigned long addr = 0;
 #if HAVE_ON_EACH_MATCH_SYMBOL
     if (likely(kallsyms_on_each_match_symbol_fn)) {
-        kallsyms_on_each_match_symbol_fn(find_kernel_symbol_exact_cb, symbol_name, &addr);
+        KSU_ICALL(kallsyms_on_each_match_symbol_fn, find_kernel_symbol_exact_cb, symbol_name, &addr);
         return addr;
     }
 #endif
@@ -134,7 +135,7 @@ static __nocfi void *resolve_symbol_variant(const char *symbol_name, size_t symb
 
 #if !ALWAYS_HAVE_ON_EACH_SYMBOL
     if (kallsyms_on_each_symbol_fn) {
-        kallsyms_on_each_symbol_fn(lookup_symbol_variant_cb, &ctx);
+        KSU_ICALL(kallsyms_on_each_symbol_fn, lookup_symbol_variant_cb, &ctx);
     }
     // TODO: iterate kallsyms by sprint_symbol
 #else
@@ -279,7 +280,7 @@ static __nocfi int ksu_batch_lookup_indexed(struct ksu_batch_ctx *ctx)
 
         if (e->addr)
             continue;
-        kallsyms_on_each_match_symbol_fn(ksu_first_match_cb, e->name, &e->addr);
+        KSU_ICALL(kallsyms_on_each_match_symbol_fn, ksu_first_match_cb, e->name, &e->addr);
         if (!e->addr)
             continue;
         ctx->remaining--;
@@ -341,7 +342,7 @@ int __nocfi ksu_lookup_kernel_symbols(const char *const *names, unsigned long *a
     if (ret >= 0 && ctx->remaining) {
 #if !ALWAYS_HAVE_ON_EACH_SYMBOL
         if (kallsyms_on_each_symbol_fn) {
-            ret = kallsyms_on_each_symbol_fn(ksu_batch_cb, ctx);
+            ret = KSU_ICALL(kallsyms_on_each_symbol_fn, ksu_batch_cb, ctx);
         } else {
             // No kallsyms walker: fall back to exact per-name lookups.
             for (i = 0; i < n; i++) {

@@ -1,4 +1,5 @@
 #include "selinux_hide.h"
+#include "infra/icall.h"
 #include "infra/symbol_resolver.h"
 #include "linux/jump_label.h"
 #include "linux/rcupdate.h"
@@ -306,7 +307,7 @@ abort_change:
     return error;
 
 call_orig:
-    return ((setprocattr_fn)selinux_setprocattr_hook.original)(name, value, size);
+    return KSU_ICALL((setprocattr_fn)selinux_setprocattr_hook.original, name, value, size);
 }
 
 static DEFINE_STATIC_KEY_FALSE(fake_status_initialize_key);
@@ -939,7 +940,7 @@ static void __nocfi type_attribute_bounds_av(struct policydb *policydb, struct c
 
     /* audit masked permissions */
     if (security_dump_masked_av_fn)
-        security_dump_masked_av_fn(policydb, scontext, tcontext, tclass, masked, "bounds");
+        KSU_ICALL(security_dump_masked_av_fn, policydb, scontext, tcontext, tclass, masked, "bounds");
 }
 
 /*
@@ -1256,7 +1257,7 @@ static void __nocfi security_compute_av_user_with_policy(struct selinux_policy *
     }
 
     if (context_struct_compute_av_fn) {
-        context_struct_compute_av_fn(policydb, scontext, tcontext, tclass, avd, NULL);
+        KSU_ICALL(context_struct_compute_av_fn, policydb, scontext, tcontext, tclass, avd, NULL);
     } else {
         context_struct_compute_av(policydb, scontext, tcontext, tclass, avd, NULL);
     }
