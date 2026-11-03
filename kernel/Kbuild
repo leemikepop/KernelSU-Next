@@ -109,9 +109,17 @@ KSU_RUNNER_CFLAGS := $(CLANG_FLAGS) -std=gnu11 -Os -Wall \
 	-fno-asynchronous-unwind-tables -fno-unwind-tables \
 	-ffunction-sections -fdata-sections
 
+# ld.lld aligns x86_64 LOAD segments to 4 KB by default; a 16 KB page-size kernel (e.g. the
+# Android 17 ps16k emulator images) refuses to exec such a runner after init has committed to
+# the exec, which kills init.  arm64's default (64 KB) already covers every page size.
+KSU_RUNNER_LDFLAGS :=
+ifeq ($(CONFIG_X86_64),y)
+KSU_RUNNER_LDFLAGS += -z max-page-size=16384
+endif
+
 quiet_cmd_ksu_runner = RUNNER  $@
       cmd_ksu_runner = $(CC) $(KSU_RUNNER_CFLAGS) -c -o $@.o $< && \
-		$(LD) -static -nostdlib -e _start --gc-sections -s -o $@ $@.o && \
+		$(LD) -static -nostdlib $(KSU_RUNNER_LDFLAGS) -e _start --gc-sections -s -o $@ $@.o && \
 		rm -f $@.o
 
 $(obj)/preinit/runner.elf: $(KSU_KERNEL_DIR)/preinit/runner/runner.c \
