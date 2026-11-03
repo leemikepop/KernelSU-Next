@@ -244,6 +244,12 @@ void *scan_call_to(void *start, size_t size, void *target)
 #include <linux/objtool.h>
 #include <asm/nops.h>
 
+/* ANNOTATE_NOENDBR came with x86 IBT (5.18, backported to later GKI 5.15/6.1 builds).
+ * Kernels without it have no IBT, so there is no ENDBR rule to annotate for. */
+#ifndef ANNOTATE_NOENDBR
+#define ANNOTATE_NOENDBR
+#endif
+
 /* The x86_64 "make this function return" stub, same shape as the kernel's
  * own just_return_func in arch/x86/lib/error-inject.c.  susfs_kp_skip_return
  * points regs->ip here, the single ret consumes the caller's return address
