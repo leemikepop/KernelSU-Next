@@ -304,7 +304,7 @@ static __nocfi int sus_mount_ida_alloc(void)
     BUILD_BUG_ON(sizeof(limit) != sizeof(limit_bits));
     memcpy(&limit_bits, &limit, sizeof(limit_bits));
     xa_lock(sus_mount_mnt_id_xa);
-    ret = SUSFS_ICALL((int (*)(struct xarray *, u32 *, void *, unsigned long, gfp_t))pfn_xa_alloc,
+    ret = SUSFS_ICALL((int (*)(struct xarray *, u32 *, void *, unsigned long, gfp_t))(void *)pfn_xa_alloc,
                       sus_mount_mnt_id_xa, &id, NULL, limit_bits, GFP_KERNEL);
     xa_unlock(sus_mount_mnt_id_xa);
 #else
